@@ -1,0 +1,5 @@
+model:
+  mode: 'rgb'
+  num_classes: 2000
+  weights: './model/nslt_2000_066792_0.353595.pt'
+  wlasl_class_list: './config/wlasl_class_list.txt'

@@ -1,0 +1,8 @@
+- install the packages from requirements.txt using pip
+- run the command:
+    FLASK_ENV=development FLASK_APP=app.py flask run
+
+- end point should be active on port 5000
+    eg: http://127.0.0.1:3000/predict [POST method]
+
+
