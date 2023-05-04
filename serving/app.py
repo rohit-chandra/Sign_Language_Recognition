@@ -1,6 +1,13 @@
 from flask import Flask, jsonify
-
-
+from torchvision import models
+from i3d import InceptionI3d
+from handler import *
+import cv2
+import numpy as np
+import tempfile
+from pathlib import Path
+from keytotext import pipeline
+from flask import request
 
 app = Flask(__name__)
 
@@ -21,37 +28,27 @@ response: {
 @app.route('/predict', methods=['POST'])
 def predict():
 
-    ''' # load config
-    config = load_conf_file('./config/config.yaml')
-    # initialize model
-    i3d = InceptionI3d(config.num_classes, config.in_channels=3)
-    i3d.load_state_dict(torch.load(config.weights, map_location=torch.device('cpu')))
-    i3d.replace_logits(num_classes)
-    i3d.eval()
-    # split video to frames
+    # load config
+    res = []
+    sentence = ""
+    
     uploaded_file  = request.files['file']
     with tempfile.TemporaryDirectory() as td:
-            temp_filename = Path(td) / 'uploaded_video'
-            uploaded_file.save(temp_filename)
-
-            vidcap = cv2.VideoCapture(str(temp_filename))
-
-
-    # process frames for i3d
-
-    # predict words
-
-    # generate sentence
+        temp_filename = Path(td) / 'uploaded_video'
+        uploaded_file.save(temp_filename)
+        print(str(temp_filename))
+        res,sentence = load_model(file=str(temp_filename))
+    print(res)
 
     # build response
-    '''
+    
 
     return jsonify({
-    'data': [{'frame_id' : 23, 'time_stamp': 234, 'prediction': 'hello'},
-    {'frame_id' : 40, 'time_stamp': 237, 'prediction': 'how'},
-    {'frame_id' : 43, 'time_stamp': 239, 'prediction': 'are'}],
-    'message': "success",
-    'sentence': "Hello, how are you?",
-    'status': "200 ok"
+        'data': [{'frame_id' : 23, 'time_stamp': 234, 'prediction': 'hello'},
+        {'frame_id' : 40, 'time_stamp': 237, 'prediction': 'how'},
+        {'frame_id' : 43, 'time_stamp': 239, 'prediction': 'are'}],
+        'message': "success",
+        'sentence': sentence,
+        'status': "200 Ok"
 })
 
