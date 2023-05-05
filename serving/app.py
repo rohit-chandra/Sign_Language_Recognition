@@ -1,14 +1,9 @@
 from flask import Flask, jsonify
-from torchvision import models
-from i3d import InceptionI3d
 from handler import *
-import cv2
-import numpy as np
-import tempfile
-from pathlib import Path
-from keytotext import pipeline
 from flask import request
 import os
+
+
 
 app = Flask(__name__)
 
@@ -23,31 +18,51 @@ response: {
     {frame_id : 40, time_stamp: 237, prediction: how},
     {frame_id : 43, time_stamp: 239, prediction: are}]
     message: "success"
-    status: "200 ok"
+    status: "200"
 }'''
+class APIError(Exception):
+    """All custom API Exceptions"""
+    pass
+
+class BadRequest(APIError):
+    code = 400
+    description = 'Bad request'
+
+@app.errorhandler(APIError)
+def handle_exception(err):
+    """Return custom JSON when APIError or its children are raised"""
+    response = {"error": err.description, "message": "", "status": err.code}
+    if len(err.args) > 0:
+        response["message"] = err.args[0]
+    return jsonify(response)
+
+@app.errorhandler(500)
+def handle_exception(err):
+    """Return JSON instead of HTML for any other server error"""
+    response = {"error": "Sorry, that error is on us, please contact support if this wasn't an accident","status": err.code}
+    return jsonify(response)
 
 @app.route('/predict', methods=['POST'])
 def predict():
 
-    # load config
     res = []
     sentence = ""
-    
-    uploaded_file  = request.files['file']
-    temp_filename = 'uploaded_video'
-    uploaded_file.save(os.path.join('data', uploaded_file.filename))
-    
-    print(os.path.join('data', uploaded_file.filename))
-    res,sentence = load_model(file=os.path.join('data', uploaded_file.filename))
-    # print(res, sentence)
 
-    # build response
-    
+    if 'file' in request.files:
+        uploaded_file  = request.files['file']
+        uploaded_file.save(os.path.join('data', uploaded_file.filename))
+        res,sentence = load_model(file=os.path.join('data', uploaded_file.filename))
 
-    return jsonify({
-        'data': res,
-        'message': "success",
-        'sentence': sentence,
-        'status': "200 Ok"
-})
+        return jsonify({
+            'data': res,
+            'message': "success",
+            'sentence': sentence,
+            'status': "200"
+            })
+    else:
+        raise BadRequest("File missing or invalid, please upload a .mp4 file")
+      
+
+
+
 

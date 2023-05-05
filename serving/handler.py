@@ -2,18 +2,10 @@ import yaml
 from i3d import InceptionI3d
 import cv2
 import numpy as np
-import tempfile
-from pathlib import Path
-from nslt_dataset_all import NSLT as Dataset
 from keytotext import pipeline
-from torchvision import models
 import torch.nn.functional as F
 import torch
-import torch.nn as nn
-from torch.autograd import Variable
-import time
 from PIL import Image
-import base64
 
 def load_conf_file(config_file):
     config = None
@@ -47,7 +39,7 @@ def load_model(file):
     res = list()
     sentence = ""
     offset = 0
-    batch = 25
+    batch = 40
     text_count = 0
     text = " "
     text_list = []
@@ -59,12 +51,11 @@ def load_model(file):
     i3d.replace_logits(config['model']['num_classes'])
     i3d.eval()
 
-    nlp_k2t = pipeline("k2t-new")
+    nlp_k2t = pipeline("k2t")
 
     vidcap = cv2.VideoCapture(str(file))
     fps = vidcap.get(cv2.CAP_PROP_FPS)
     video_length = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
-    print(video_length)
     
     
     font = cv2.FONT_HERSHEY_TRIPLEX
@@ -89,9 +80,7 @@ def load_model(file):
                 frames.append(frame)
                     
                 if offset % 20 == 0:
-                    print("curr offset: ", offset)
                     text = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
-                    print("text percent: ", text, offset)
                     if text != " ":
                         text_count = text_count + 1
                             
@@ -101,19 +90,13 @@ def load_model(file):
                             sentence = sentence + " " + text
                             
                         if(text_count > 2):
-                            print("text list percent: ", text_list)
                             sentence = nlp_k2t(text_list)
-                            print("curr sentence percent 20: ", sentence)
                         cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
-                        img = Image.fromarray(frame1, 'RGB')
-                        img_bytes = img.tobytes()
                         res.append({ 'timestamp':str(count/fps), 'prediction': text})
             else:
                 frames.append(frame)
                 if offset == batch:
-                    print("was here")
                     text = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
-                    print("the text: ", text)
                     if text != " ":
                         text_count = text_count + 1
                         if bool(text_list) != False and bool(word_list) != False and text_list[-1] != text and word_list[-1] != text or bool(text_list) == False:
@@ -124,14 +107,10 @@ def load_model(file):
                                 
                                         
                         if(text_count > 2):
-                            print("text list batch: ", text_list)
 
                             sentence = nlp_k2t(text_list)
-                            print("curr sentence batch: ", sentence)
 
                         cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
-                        img = Image.fromarray(frame1, 'RGB')
-                        img_bytes = img.tobytes()
                         res.append({'timestamp':str(count/fps), 'prediction': text})
                             
                     
@@ -156,7 +135,6 @@ def load_model(file):
 
 
 def run_on_tensor(ip_tensor):
-    print("in fun on tensor")
 
     ip_tensor = ip_tensor[None, :]
     
