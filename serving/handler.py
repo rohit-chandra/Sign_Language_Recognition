@@ -12,7 +12,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import time
-
+from PIL import Image
+import base64
 
 def load_conf_file(config_file):
     config = None
@@ -41,16 +42,16 @@ def create_WLASL_dictionary(wlasl_class_list_file):
 def load_model(file):
     # load config
     config = load_conf_file(config_file ='./config/config.yaml')
-
+    create_WLASL_dictionary(config['model']['wlasl_class_list'])
     frames = []
-    words = []
-    res = []
+    res = list()
     sentence = ""
     offset = 0
-    batch = 40
+    batch = 25
     text_count = 0
     text = " "
     text_list = []
+    word_list =[]
     # initialize model
     global i3d
     i3d = InceptionI3d(config['model']['num_classes'], config['model']['in_channels'])
@@ -58,36 +59,39 @@ def load_model(file):
     i3d.replace_logits(config['model']['num_classes'])
     i3d.eval()
 
-    nlp_k2t = pipeline("k2t")
+    nlp_k2t = pipeline("k2t-new")
 
     vidcap = cv2.VideoCapture(str(file))
+    fps = vidcap.get(cv2.CAP_PROP_FPS)
     video_length = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
     print(video_length)
-    ret, frame1 = vidcap.read()
-    offset = offset + 1
+    
+    
     font = cv2.FONT_HERSHEY_TRIPLEX
     count = 0
-    while vidcap.isOpened():
-
+    while True:
+        ret, frame1 = vidcap.read()
+        offset = offset + 1
+        count+=1
         if ret == True:
-            count+=1
-            offset+=1
-            print(count, offset, offset % 20)
-                        
-            if offset > batch:
-                w, h, c = frame1.shape
-                sc = 224 / w
-                sx = 224 / h
-                frame = cv2.resize(frame1, dsize=(0, 0), fx=sx, fy=sc)
-                frame1 = cv2.resize(frame1, dsize = (1280,720))
-                frame = (frame / 255.) * 2 - 1
+            w, h, c = frame1.shape
+            sc = 224 / w
+            sx = 224 / h
+            frame = cv2.resize(frame1, dsize=(0, 0), fx=sx, fy=sc)
+            frame1 = cv2.resize(frame1, dsize = (1280,720))
+    
+            frame = (frame / 255.) * 2 - 1
 
+
+            if offset > batch:
+               
                 frames.pop(0)
                 frames.append(frame)
                     
                 if offset % 20 == 0:
                     print("curr offset: ", offset)
-                    text = run_on_tensor(torch.Tensor(np.asarray(frames, dtype=np.float32)))
+                    text = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
+                    print("text percent: ", text, offset)
                     if text != " ":
                         text_count = text_count + 1
                             
@@ -97,22 +101,18 @@ def load_model(file):
                             sentence = sentence + " " + text
                             
                         if(text_count > 2):
-                            sentence = nlp(text_list,**params)
+                            print("text list percent: ", text_list)
+                            sentence = nlp_k2t(text_list)
                             print("curr sentence percent 20: ", sentence)
                         cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
-                        res.append({'frame': frame1, 'prediction': text})
+                        img = Image.fromarray(frame1, 'RGB')
+                        img_bytes = img.tobytes()
+                        res.append({ 'timestamp':str(count/fps), 'prediction': text})
             else:
-                w, h, c = frame1.shape
-                sc = 224 / w
-                sx = 224 / h
-                frame = cv2.resize(frame1, dsize=(0, 0), fx=sx, fy=sc)
-                frame1 = cv2.resize(frame1, dsize = (1280,720))
-                frame = (frame / 255.) * 2 - 1
-
                 frames.append(frame)
                 if offset == batch:
                     print("was here")
-                    text = run_on_tensor(torch.Tensor(np.asarray(frames, dtype=np.float32)))
+                    text = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
                     print("the text: ", text)
                     if text != " ":
                         text_count = text_count + 1
@@ -124,11 +124,15 @@ def load_model(file):
                                 
                                         
                         if(text_count > 2):
-                            sentence = nlp_k2t(text_list,**params)
+                            print("text list batch: ", text_list)
+
+                            sentence = nlp_k2t(text_list)
                             print("curr sentence batch: ", sentence)
 
                         cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
-                        res.append({'frame': frame1, 'prediction': text})
+                        img = Image.fromarray(frame1, 'RGB')
+                        img_bytes = img.tobytes()
+                        res.append({'timestamp':str(count/fps), 'prediction': text})
                             
                     
                 # if 0xFF == ord('q'):
@@ -152,13 +156,12 @@ def load_model(file):
 
 
 def run_on_tensor(ip_tensor):
-    print("in fun on tensor", ip_tensor)
+    print("in fun on tensor")
 
     ip_tensor = ip_tensor[None, :]
     
     t = ip_tensor.shape[2] 
     per_frame_logits = i3d(ip_tensor)
-    print(per_frame_logits)
     predictions = F.upsample(per_frame_logits, t, mode='linear')
 
     predictions = predictions.transpose(2, 1)
@@ -173,10 +176,10 @@ def run_on_tensor(ip_tensor):
     The 0.5 is threshold value, it varies if the batch sizes are reduced.
     
     """
-    if max(F.softmax(torch.from_numpy(arr[0]), dim=0)) > 0.5:
-        return wlasl_dict[out_labels[0][-1]]
-    else:
-        return " " 
+    # if max(F.softmax(torch.from_numpy(arr[0]), dim=0)) > 0.5:
+    return wlasl_dict[out_labels[0][-1]]
+    # else:
+    #     return " " 
 
 class PredictionResult():
     def __init__(self, frame_id=None, time_stamp=None, prediction=None):

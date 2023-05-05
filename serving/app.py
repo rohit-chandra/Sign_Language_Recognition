@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from keytotext import pipeline
 from flask import request
+import os
 
 app = Flask(__name__)
 
@@ -33,20 +34,18 @@ def predict():
     sentence = ""
     
     uploaded_file  = request.files['file']
-    with tempfile.TemporaryDirectory() as td:
-        temp_filename = Path(td) / 'uploaded_video'
-        uploaded_file.save(temp_filename)
-        print(str(temp_filename))
-        res,sentence = load_model(file=str(temp_filename))
-    print(res)
+    temp_filename = 'uploaded_video'
+    uploaded_file.save(os.path.join('data', uploaded_file.filename))
+    
+    print(os.path.join('data', uploaded_file.filename))
+    res,sentence = load_model(file=os.path.join('data', uploaded_file.filename))
+    # print(res, sentence)
 
     # build response
     
 
     return jsonify({
-        'data': [{'frame_id' : 23, 'time_stamp': 234, 'prediction': 'hello'},
-        {'frame_id' : 40, 'time_stamp': 237, 'prediction': 'how'},
-        {'frame_id' : 43, 'time_stamp': 239, 'prediction': 'are'}],
+        'data': res,
         'message': "success",
         'sentence': sentence,
         'status': "200 Ok"
