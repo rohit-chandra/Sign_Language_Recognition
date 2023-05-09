@@ -4,4 +4,6 @@ model:
   weights: './model/nslt_2000_066792_0.353595.pt'
   wlasl_class_list: './config/wlasl_class_list.txt'
   in_channels: 3
+  hugging_face_k2t_token: "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"
+  hugging_face_k2t_api : "https://api-inference.huggingface.co/models/beyond/genius-base"
   

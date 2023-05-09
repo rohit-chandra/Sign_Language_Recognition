@@ -6,6 +6,10 @@ from keytotext import pipeline
 import torch.nn.functional as F
 import torch
 from PIL import Image
+import requests
+from flask import jsonify
+import json
+
 
 def load_conf_file(config_file):
     config = None
@@ -33,6 +37,7 @@ def create_WLASL_dictionary(wlasl_class_list_file):
 
 def load_model(file):
     # load config
+    global config
     config = load_conf_file(config_file ='./config/config.yaml')
     create_WLASL_dictionary(config['model']['wlasl_class_list'])
     frames = []
@@ -51,7 +56,7 @@ def load_model(file):
     i3d.replace_logits(config['model']['num_classes'])
     i3d.eval()
 
-    nlp_k2t = pipeline("k2t")
+
 
     vidcap = cv2.VideoCapture(str(file))
     fps = vidcap.get(cv2.CAP_PROP_FPS)
@@ -90,8 +95,8 @@ def load_model(file):
                             sentence = sentence + " " + text
                             
                         if(text_count > 2):
-                            sentence = nlp_k2t(text_list)
-                        cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
+                            sentence = k2t_query(sentence)
+                        # cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
                         res.append({ 'timestamp':str(count/fps), 'prediction': text})
             else:
                 frames.append(frame)
@@ -108,9 +113,9 @@ def load_model(file):
                                         
                         if(text_count > 2):
 
-                            sentence = nlp_k2t(text_list)
+                            sentence = k2t_query(sentence)
 
-                        cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
+                        # cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
                         res.append({'timestamp':str(count/fps), 'prediction': text})
                             
                     
@@ -158,6 +163,22 @@ def run_on_tensor(ip_tensor):
     return wlasl_dict[out_labels[0][-1]]
     # else:
     #     return " " 
+
+def k2t_query(payload):
+    ip_payload = {
+        "inputs": payload
+    }
+    token_ = config['model']['hugging_face_k2t_token']
+    headers = {"Authorization": f"Bearer {token_}"}
+    try: 
+        response = requests.post(config['model']['hugging_face_k2t_api'], headers=headers, json=ip_payload)
+        print(response)
+        resp_obj = response.json()
+        sentence = resp_obj[0]['generated_text']
+        return sentence
+    except:
+        return ""
+	
 
 class PredictionResult():
     def __init__(self, frame_id=None, time_stamp=None, prediction=None):
