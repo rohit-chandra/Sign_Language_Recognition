@@ -1,7 +1,9 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 from handler import *
 from flask import request
 import os
+# from camera import VideoCamera
+
 
 
 app = Flask(__name__)
@@ -41,6 +43,10 @@ def handle_exception(err):
     response = {"error": "Sorry, that error is on us, please contact support if this wasn't an accident","status": err.code}
     return jsonify(response)
 
+@app.route('/')
+def index():
+    return render_template('index2.html')
+
 @app.route('/predict', methods=['POST'])
 def predict():
 
@@ -62,6 +68,22 @@ def predict():
         raise BadRequest("File missing or invalid, please upload a .mp4 file")
       
 
+def gen(camera):
+    while True:
+        try:
+            frame = camera.get_frame()
+            print(frame)
+        except Exception:
+            print("Video is finished or empty")
+            # return None
+            frame = camera.get_heartbeat()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
 
 
+@app.route('/video_feed')
+def video_feed():
+    return None
+    # return Response(gen(VideoCamera()),
+    #                 mimetype='multipart/x-mixed-replace; boundary=frame')
 
