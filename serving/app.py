@@ -83,7 +83,22 @@ def gen(camera):
 
 @app.route('/video_feed')
 def video_feed():
-    return None
+
+    res = []
+    sentence = ""
+
+    try:
+    
+        res,sentence = load_model_for_live()
+
+        return jsonify({
+            'data': res,
+            'message': "success",
+            'sentence': sentence,
+            'status': "200"
+            })
+    except:
+        raise BadRequest("Give Video permissions")
     # return Response(gen(VideoCamera()),
     #                 mimetype='multipart/x-mixed-replace; boundary=frame')
 
