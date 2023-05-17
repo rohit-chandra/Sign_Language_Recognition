@@ -85,22 +85,22 @@
         var formdata = new FormData();
         formdata.append('file', $('#btn_file')[0].files[0]);    //upload
         $.ajax({
-            url: 'http://127.0.0.1:4200/predict',
+            url: 'http://127.0.0.1:5000/predict',
             type: 'post',
             contentType: false,       
             processData: false,
             data: formdata,
             success: function (data) {
                 console.log('111111111111111111111111')
-                console.log(data.data2)  //data is a json object. The object has two arrays. The first is the array of objects. Each object is a line. The second array is the array of objects. Each object is a line.
-                for(var i=0;i<data.data2.words.length;i++){
-                    html='<div><span>time:'+data.data2.words[i].time_stamp+'</span>，<span>predict:'+data.data2.words[i].prediction+'</span></div>'
+                console.log(data.data)  //data is a json object. The object has two arrays. The first is the array of objects. Each object is a line. The second array is the array of objects. Each object is a line.
+                for(var i=0;i<data.data.length;i++){
+                    html='<div><span>time:'+data.data[i].timestamp.toString()+'</span>，<span>predict:'+data.data[i].prediction+'</span></div>'
                     $('.box2023').append(html)
                     
                 }
-                $('.box2023').append('<div>KeyToText :'+data.data2.sentence+'</div>')
+                $('.box2023').append('<div>KeyToText :'+data.sentence+'</div>')
                 $('#box1').html('<div id="videos" class="box col-lg-8  offset-lg-2" >\n' +
-                    '            <video controls="controls" src="' + data.data + '" width="600" height="534" style="margin-top: -104px;"></video>\n' +
+                    '            <video controls="controls" src="' + data.video_path + '" width="600" height="534" style="margin-top: -104px;"></video>\n' +
                     '        </div>')
             }
         })

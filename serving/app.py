@@ -56,11 +56,13 @@ def predict():
     if 'file' in request.files:
         uploaded_file  = request.files['file']
         uploaded_file.save(os.path.join('data', uploaded_file.filename))
+        uploaded_file.save(os.path.join('static/video/', uploaded_file.filename))
         res,sentence = load_model(file=os.path.join('data', uploaded_file.filename))
 
         return jsonify({
             'data': res,
             'message': "success",
+            'video_path': os.path.join('/static/video/', uploaded_file.filename),
             'sentence': sentence,
             'status': "200"
             })
