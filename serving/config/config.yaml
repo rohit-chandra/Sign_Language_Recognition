@@ -1,7 +1,7 @@
 model:
   mode: 'rgb'
   num_classes: 2000
-  weights: './model/nslt_2000_066792_0.353595.pt'
+  weights: './model/FINAL_nslt_2000_iters=5104_top1=32.48_top5=57.31_top10=66.31.pt'
   wlasl_class_list: './config/wlasl_class_list.txt'
   in_channels: 3
   hugging_face_k2t_token: "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"

@@ -1,8 +1,11 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template,Response
 from handler import *
 from flask import request
 import os
-# from camera import VideoCamera
+import shutil
+from werkzeug.utils import secure_filename
+from camera import VideoCamera
+from time import time
 
 
 
@@ -15,7 +18,7 @@ request route: /predict
 request params: file
 response type: JSON
 response: {
-    data: [{frame_id : 23, time_stamp: 234, prediction: hello},
+    data: [{frame_id : 23, timestamp: 234, prediction: hello},
     {frame_id : 40, time_stamp: 237, prediction: how},
     {frame_id : 43, time_stamp: 239, prediction: are}]
     message: "success"
@@ -54,15 +57,29 @@ def predict():
     sentence = ""
 
     if 'file' in request.files:
+
+        '''
+         fileStorage = request.files['file']
+        file_name = secure_filename(fileStorage.filename)
+        fileStorage.save('./static/video/%s' % file_name)
+
+        fileStorage = request.files['file']
+        file_name = secure_filename(fileStorage.filename)
+        fileStorage.save('./static/video/%s' % file_name)
+
+
+
+        res,sentence = load_model(file=os.path.join('./static/video/', fileStorage.filename))
+        '''
         uploaded_file  = request.files['file']
         uploaded_file.save(os.path.join('data', uploaded_file.filename))
-        uploaded_file.save(os.path.join('static/video/', uploaded_file.filename))
-        res,sentence = load_model(file=os.path.join('data', uploaded_file.filename))
+        shutil.copy2(os.path.join('data', uploaded_file.filename), os.path.join('./static/video/', uploaded_file.filename)) 
+        res,sentence = load_model(file=os.path.join('./static/video/', uploaded_file.filename))
 
         return jsonify({
             'data': res,
             'message': "success",
-            'video_path': os.path.join('/static/video/', uploaded_file.filename),
+            'video_path': os.path.join('./static/video/', uploaded_file.filename),
             'sentence': sentence,
             'status': "200"
             })
@@ -74,33 +91,47 @@ def gen(camera):
     while True:
         try:
             frame = camera.get_frame()
-            print(frame)
+            # print(frame)
         except Exception:
             print("Video is finished or empty")
             # return None
             frame = camera.get_heartbeat()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+@app.route('/video_feed2')
+def video_feed2():
+    end = time() + 20
+    vc = VideoCamera()
+    print("inside vc")
+    while time() < end:
+        if time() < end-1:
+            return Response(gen(vc),
+                            mimetype='multipart/x-mixed-replace; boundary=frame')
+        else:
+            vc.__del__()
+    
+    print("AFTER RELEASE")
 
-
-@app.route('/video_feed')
+@app.route('/video_feed', methods=['POST'])
 def video_feed():
 
     res = []
     sentence = ""
 
-    try:
+    # try:
     
-        res,sentence = load_model_for_live()
+    res,sentence,video_path = load_model_for_live()
+        
 
-        return jsonify({
+    return jsonify({
             'data': res,
             'message': "success",
             'sentence': sentence,
+            'video_path':video_path,
             'status': "200"
             })
-    except:
-        raise BadRequest("Give Video permissions")
+    # except:
+    #     raise BadRequest("Give Video permissions")
     # return Response(gen(VideoCamera()),
     #                 mimetype='multipart/x-mixed-replace; boundary=frame')
 
