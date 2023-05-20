@@ -5,6 +5,9 @@ import numpy as np
 import torch.nn.functional as F
 import torch
 import requests
+import time
+import matplotlib.pyplot as plt
+
 
 
 def load_conf_file(config_file):
@@ -81,7 +84,7 @@ def load_model(file):
                 frames.append(frame)
                     
                 if offset % 20 == 0:
-                    text = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
+                    text, probability_ = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
                     if text != " ":
                         text_count = text_count + 1
                             
@@ -91,11 +94,11 @@ def load_model(file):
                             sentence = sentence + " " + text
     
                         # cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
-                        res.append({ 'timestamp':str(count/fps), 'prediction': text})
+                        res.append({ 'timestamp':str(count/fps), 'prediction': text,})
             else:
                 frames.append(frame)
                 if offset == batch:
-                    text = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
+                    text, probability_ = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
                     if text != " ":
                         text_count = text_count + 1
                         if bool(text_list) != False and bool(word_list) != False and text_list[-1] != text and word_list[-1] != text or bool(text_list) == False:
@@ -105,7 +108,7 @@ def load_model(file):
 
 
                         # cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
-                        res.append({'timestamp':str(count/fps), 'prediction': text})
+                        res.append({'timestamp':str(count/fps), 'prediction': text, 'probabilty': probability_})
                             
                 # if 0xFF == ord('q'):
                 #     break
@@ -141,6 +144,23 @@ def run_on_tensor(ip_tensor):
     predictions = predictions.transpose(2, 1)
     out_labels = np.argsort(predictions.cpu().detach().numpy()[0])
     arr = predictions.cpu().detach().numpy()[0] 
+    arr_ = predictions.cpu().detach().numpy()[0].T
+
+    '''
+     for i in np.argsort(probabilities)[::-1]:
+        print(f"  {class_vocab[i]}: {probabilities[i] * 100:5.2f}%")
+    return frames
+    '''
+    plt.switch_backend('Agg') 
+    plt.plot(range(len(arr_)), F.softmax(torch.from_numpy(arr_), dim=0).numpy())
+    plt.savefig('./static/plots/new_plot.png')
+
+    # print("-----------------------------------------------------------")
+    # for i,prediction in enumerate(out_labels):
+    #     print(f"  {wlasl_dict[out_labels[i][-1]]}: {float(max(F.softmax(torch.from_numpy(arr[i]), dim=0)))}%")
+    # print("-----------------------------------------------------------")
+
+   
 
     print(float(max(F.softmax(torch.from_numpy(arr[0]), dim=0))))
     print(wlasl_dict[out_labels[0][-1]])
@@ -150,8 +170,8 @@ def run_on_tensor(ip_tensor):
     The 0.5 is threshold value, it varies if the batch sizes are reduced.
     
     """
-    # if max(F.softmax(torch.from_numpy(arr[0]), dim=0)) > 0.5:
-    return wlasl_dict[out_labels[0][-1]]
+    # if max(F.softmax(torch.from_numpy(arr[0]), dim=0)) > 0.3:
+    return wlasl_dict[out_labels[0][-1]], float(max(F.softmax(torch.from_numpy(arr[0]), dim=0)))
     # else:
     #     return " " 
 
@@ -181,16 +201,22 @@ def load_model_for_live():
     sentence = ""
     offset = 0
     batch = 40
+    limit = 50
     text_count = 0
     text = " "
     text_list = []
     word_list =[]
+    image_size = (640,480)
     # initialize model
     global i3d
     i3d = InceptionI3d(config['model']['num_classes'], config['model']['in_channels'])
     i3d.load_state_dict(torch.load(config['model']['weights'], map_location=torch.device('cpu')))
     i3d.replace_logits(config['model']['num_classes'])
     i3d.eval()
+    epoch = time.strftime("%Y%m%d-%H%M%S")
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+
+    out = cv2.VideoWriter('./static/output_{}.mp4'.format(epoch), fourcc, 20.0, (640,480))
 
 
 
@@ -221,7 +247,7 @@ def load_model_for_live():
                 frames.append(frame)
                     
                 if offset % 20 == 0:
-                    text = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
+                    text , probability_ = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
                     if text != " ":
                         text_count = text_count + 1
                             
@@ -232,12 +258,13 @@ def load_model_for_live():
                             
                         if(text_count > 2):
                             sentence = k2t_query(sentence)
-                        # cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
-                        res.append({ 'timestamp':str(count/fps), 'prediction': text})
+                        cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
+                        out.write(frame1)
+                        res.append({ 'timestamp':str(count/fps), 'prediction': text, 'probabilty': probability_})
             else:
                 frames.append(frame)
                 if offset == batch:
-                    text = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
+                    text, probability_ = run_on_tensor(torch.from_numpy((np.asarray(frames, dtype=np.float32)).transpose([3, 0, 1, 2])))
                     if text != " ":
                         text_count = text_count + 1
                         if bool(text_list) != False and bool(word_list) != False and text_list[-1] != text and word_list[-1] != text or bool(text_list) == False:
@@ -251,16 +278,17 @@ def load_model_for_live():
 
                             sentence = k2t_query(sentence)
 
-                        # cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
-                        res.append({'timestamp':str(count/fps), 'prediction': text})
+                        cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
+                        out.write(frame1)
+                        res.append({'timestamp':str(count/fps), 'prediction': text, 'probabilty': probability_})
                             
-                    
-                if 0xFF == ord('q'):
-                    vidcap.release()
+            if count == limit:
                     break
+
                         
-            # cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
-                        
+            cv2.putText(frame1, sentence, (120, 520), font, 0.9, (0, 255, 255), 2, cv2.LINE_4)
+            out.write(frame1)
+            # cv2.imshow('frame', frame1)           
             if len(text_list) > 10:
                 text_list.pop()
                 text_list.pop()
@@ -271,8 +299,13 @@ def load_model_for_live():
             # if (count > (video_length-1)):
             #     vidcap.release()
             #     break
+        
     print("Done processing!") 
-    return res,sentence
+    
+    vidcap.release()
+    out.release()
+    # cv2.destroyAllWindows()
+    return res,sentence,'./static/output_{}.mp4'.format(epoch)
 
 class PredictionResult():
     def __init__(self, frame_id=None, time_stamp=None, prediction=None):
